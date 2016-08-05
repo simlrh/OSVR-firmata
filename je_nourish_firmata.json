@@ -1,0 +1,21 @@
+{
+  "deviceVendor": "OSVR",
+  "deviceName": "StandardFirmata",
+  "author": "Steve Le Roy Harris <steve@nourish.je>",
+  "version": 1,
+  "lastModified": "2015-01-30T21:13:07.585Z",
+  "interfaces": {
+    "analog": {
+      "count": 6,
+      "traits": [
+        {
+          "min": 0,
+          "max": 1023
+        }
+      ]
+    },
+	"button": {
+	  "count": 14
+	}
+  }
+}

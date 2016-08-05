@@ -1,0 +1,3 @@
+[submodule "vendor/firmatacpp"]
+	path = vendor/firmatacpp
+	url = https://github.com/simlrh/firmatacpp
