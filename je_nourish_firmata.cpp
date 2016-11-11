@@ -16,6 +16,7 @@
 #include <thread>
 #include <chrono>
 #include <mutex>
+#include <memory>
 
 // Anonymous namespace to avoid symbol collision
 namespace {
@@ -36,9 +37,8 @@ namespace {
 
 	void thread_function(thread_data& data)
 	{
-		std::lock_guard<std::mutex>* guard;
 		try {
-			guard = new std::lock_guard<std::mutex>(data.mutex);
+			data.mutex.lock();
 
 			firmata::FirmSerial* firmio = new firmata::FirmSerial(data.port);
 			data.firmata = new firmata::Firmata<firmata::Base>(firmio);
@@ -52,15 +52,16 @@ namespace {
 			data.firmata->reportDigital(0, 1);
 			data.firmata->reportDigital(1, 1);
 
-			delete guard;
+			data.mutex.unlock();
 
 			do {
-				guard = new std::lock_guard<std::mutex>(data.mutex);
+				data.mutex.lock();
 				if (data.end) break;
 				data.firmata->parse();
-				delete guard;
+				data.mutex.unlock();
 			} while (1);
 
+			data.mutex.unlock();
 			delete data.firmata;
 		}
 		catch (firmata::IOException e) {
@@ -69,7 +70,6 @@ namespace {
 		catch (firmata::NotOpenException e) {
 			std::cout << e.what() << std::endl;
 		}
-
 	}
 
 	class FirmataDevice {
@@ -81,36 +81,38 @@ namespace {
 
 			std::this_thread::sleep_for(std::chrono::milliseconds(3000));
 
-			std::lock_guard<std::mutex> guard(m_thread_data.mutex);
+			m_thread_data.mutex.lock();
 			m_valid = m_thread_data.firmata != NULL && m_thread_data.firmata->ready() && m_thread_data.firmata->name.compare(firmwareName) == 0;
+			m_thread_data.mutex.unlock();
 
-			if (!m_valid) {
+			if (m_valid) {
+				std::string deviceName = m_thread_data.firmata->name +
+					"-" + std::to_string(m_thread_data.firmata->major_version) +
+					"." + std::to_string(m_thread_data.firmata->minor_version);
+
+				std::cout << "Found " << deviceName << std::endl;
+
+				OSVR_DeviceInitOptions opts = osvrDeviceCreateInitOptions(ctx);
+
+				osvrDeviceAnalogConfigure(opts, &m_analog, 6);
+				osvrDeviceButtonConfigure(opts, &m_button, 14);
+
+				m_dev.initAsync(ctx, deviceName, opts);
+
+				m_dev.sendJsonDescriptor(je_nourish_firmata_json);
+
+				m_dev.registerUpdateCallback(this);
+			}
+			else {
 				std::cout << "Not found" << std::endl;
-				return;
 			}
 
-			std::string deviceName = m_thread_data.firmata->name +
-				"-" + std::to_string(m_thread_data.firmata->major_version) +
-				"." + std::to_string(m_thread_data.firmata->minor_version);
-
-			std::cout << "Found " << deviceName << std::endl;
-
-			OSVR_DeviceInitOptions opts = osvrDeviceCreateInitOptions(ctx);
-
-			osvrDeviceAnalogConfigure(opts, &m_analog, 6);
-			osvrDeviceButtonConfigure(opts, &m_button, 14);
-
-			m_dev.initAsync(ctx, deviceName, opts);
-
-			m_dev.sendJsonDescriptor(je_nourish_firmata_json);
-
-			m_dev.registerUpdateCallback(this);
 		}
 
 		~FirmataDevice() {
-			std::lock_guard<std::mutex>* guard = new std::lock_guard<std::mutex>(m_thread_data.mutex);
+			m_thread_data.mutex.lock();
 			m_thread_data.end = true;
-			delete guard;
+			m_thread_data.mutex.unlock();
 			m_thread->join();
 		}
 
@@ -119,7 +121,10 @@ namespace {
 		}
 
 		OSVR_ReturnCode update() {
-			std::lock_guard<std::mutex> guard(m_thread_data.mutex);
+			if (m_thread_data.end) {
+				return OSVR_RETURN_SUCCESS;
+			}
+			m_thread_data.mutex.lock();
 
 			if (m_thread_data.firmata != NULL && m_thread_data.firmata->ready()) {
 				OSVR_AnalogState analog[6] = {
@@ -153,6 +158,7 @@ namespace {
 				osvrDeviceButtonSetValues(m_dev, m_button, buttons, 14);
 			}
 
+			m_thread_data.mutex.unlock();
 			return OSVR_RETURN_SUCCESS;
 		}
 
