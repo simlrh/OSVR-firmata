@@ -1,4 +1,4 @@
-# OSVR-firmata
+# OSVR-firmata [![Donate](https://nourish.je/assets/images/donate.svg)](http://ko-fi.com/A250KJT)
 
 An OSVR plugin to report the analog and digital inputs of a connected Arduino running the StandardFirmata firmware.
 
