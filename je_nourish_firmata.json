@@ -1,7 +1,7 @@
 {
   "deviceVendor": "OSVR",
   "deviceName": "StandardFirmata",
-  "author": "Steve Le Roy Harris <steve@nourish.je>",
+  "author": "simlrh",
   "version": 1,
   "lastModified": "2015-01-30T21:13:07.585Z",
   "interfaces": {
